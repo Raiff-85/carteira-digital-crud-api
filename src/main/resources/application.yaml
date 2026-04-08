@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: carteira-digital-api
+  datasource:
+    url: jdbc:postgresql://localhost:5432/carteira_digital_db
+    username: postgres
+    password: senha123
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+  flyway:
+    enabled: true
