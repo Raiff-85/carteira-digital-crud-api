@@ -1,6 +1,6 @@
-package br.com.emanoel_raiff.carteira_digital_api.repository;
+package br.com.emanoel_raiff.carteira_digital_crud_api.repository;
 
-import br.com.emanoel_raiff.carteira_digital_api.entity.Usuario;
+import br.com.emanoel_raiff.carteira_digital_crud_api.entity.Usuario;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

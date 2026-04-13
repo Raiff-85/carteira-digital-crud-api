@@ -1,4 +1,4 @@
-package br.com.emanoel_raiff.carteira_digital_api.entity;
+package br.com.emanoel_raiff.carteira_digital_crud_api.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
@@ -30,4 +30,11 @@ public class Transacao {
     @ManyToOne
     @JoinColumn(name = "usuario_id", nullable = false)
     private Usuario usuario;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private TipoTransacao tipo;
+
+    @Column(length = 255)
+    private String descricao;
 }

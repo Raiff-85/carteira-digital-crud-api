@@ -1,0 +1,1 @@
+ALTER TABLE transacoes ADD COLUMN descricao VARCHAR(255);
