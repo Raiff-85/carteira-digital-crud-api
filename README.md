@@ -5,11 +5,11 @@ API REST para gerenciamento de transações financeiras e usuários.
 ## Tecnologias
 
 * **Java 21**
-* **Spring Boot 4.x**
+* **Spring Boot v3.4.3**
 * **PostgreSQL** (via Docker na porta 5432)
 * **Hibernate** (Validação e mapeamento)
 * **Flyway** (Versionamento de banco de dados)
-* **Lombok** & **Bean Validation**
+* **Lombok** v1.18.30 & **Bean Validation**
 
 ## Pré-requisitos
 
@@ -53,11 +53,7 @@ Como este projeto foca na qualidade de software, as seguintes camadas de testes 
 
 mvn test
 
-2. Validação via Postman
-   Na pasta postman deste repositório, encontram-se a Collection e o Environment para importação.
-
-Collection: carteira-digital-api.postman_collection.json
-Cenários testados: Cadastro de usuários, validação de saldo insuficiente e fluxo de transferência bem-sucedido.
+2. Validação via Postman e Cypress
 
 3. Dicas de Observabilidade
    Logs: Verifique o console do IntelliJ para acompanhar as queries SQL geradas pelo Hibernate e as migrações do Flyway.
