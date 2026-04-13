@@ -7,6 +7,7 @@ import br.com.emanoel_raiff.carteira_digital_crud_api.exception.EntidadeNaoEncon
 import br.com.emanoel_raiff.carteira_digital_crud_api.exception.RegraDeNegocioException;
 import br.com.emanoel_raiff.carteira_digital_crud_api.repository.TransacaoRepository;
 import br.com.emanoel_raiff.carteira_digital_crud_api.repository.UsuarioRepository;
+import br.com.emanoel_raiff.carteira_digital_crud_api.repository.CarteiraRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -23,37 +24,42 @@ public class TransacaoService {
     @Autowired
     private UsuarioRepository usuarioRepository;
 
-    private Usuario buscarUsuarioOuFalhar(Long id) {
-        return usuarioRepository.findById(id)
-                .orElseThrow(() -> new EntidadeNaoEncontradaException("Usuário não encontrado (ID: " + id + ")"));
+    @Autowired
+    private CarteiraRepository carteiraRepository;
+
+    public Transacao salvar(Transacao transacao) {
+        // Validação preventiva: verifica se o ID da carteira foi enviado
+        if (transacao.getCarteira() == null || transacao.getCarteira().getId() == null) {
+            throw new RegraDeNegocioException("O ID da carteira é obrigatório para realizar uma transação.");
+        }
+
+        // Validação: verifica se a carteira realmente existe no banco
+        carteiraRepository.findById(transacao.getCarteira().getId())
+                .orElseThrow(() -> new EntidadeNaoEncontradaException("Carteira não encontrada para o ID informado."));
+
+        return transacaoRepository.save(transacao);
     }
 
     public List<Transacao> listarTodas() {
         return transacaoRepository.findAll();
     }
 
-    // Método salvar corrigido para a nova arquitetura
-    public Transacao salvar(Transacao transacao) {
-        // Se a transação estiver tentando ser salva sem carteira, lançamos erro
-        if (transacao.getCarteira() == null || transacao.getCarteira().getId() == null) {
-            throw new RegraDeNegocioException("Uma carteira válida deve ser informada.");
-        }
-        return transacaoRepository.save(transacao);
+    private Usuario buscarUsuarioOuFalhar(Long id) {
+        return usuarioRepository.findById(id)
+                .orElseThrow(() -> new EntidadeNaoEncontradaException("Usuário não encontrado."));
     }
 
     @Transactional
     public Transacao depositar(Long usuarioId, BigDecimal valor) {
         Usuario usuario = buscarUsuarioOuFalhar(usuarioId);
-
-        BigDecimal novoSaldo = usuario.getCarteira().getSaldo().add(valor);
-        usuario.getCarteira().setSaldo(novoSaldo);
+        usuario.getCarteira().setSaldo(usuario.getCarteira().getSaldo().add(valor));
         usuarioRepository.save(usuario);
 
         Transacao transacao = new Transacao();
         transacao.setValor(valor);
         transacao.setTipo(TipoTransacao.DEPOSITO);
         transacao.setCarteira(usuario.getCarteira());
-        transacao.setDescricao("Depósito em conta");
+        transacao.setDescricao("Depósito via API");
 
         return transacaoRepository.save(transacao);
     }
@@ -63,18 +69,17 @@ public class TransacaoService {
         Usuario usuario = buscarUsuarioOuFalhar(usuarioId);
 
         if (usuario.getCarteira().getSaldo().compareTo(valor) < 0) {
-            throw new RegraDeNegocioException("Saldo insuficiente para realizar o saque.");
+            throw new RegraDeNegocioException("Saldo insuficiente para saque.");
         }
 
-        BigDecimal novoSaldo = usuario.getCarteira().getSaldo().subtract(valor);
-        usuario.getCarteira().setSaldo(novoSaldo);
+        usuario.getCarteira().setSaldo(usuario.getCarteira().getSaldo().subtract(valor));
         usuarioRepository.save(usuario);
 
         Transacao transacao = new Transacao();
         transacao.setValor(valor);
         transacao.setTipo(TipoTransacao.SAQUE);
         transacao.setCarteira(usuario.getCarteira());
-        transacao.setDescricao("Saque em espécie");
+        transacao.setDescricao("Saque via API");
 
         return transacaoRepository.save(transacao);
     }
@@ -110,9 +115,6 @@ public class TransacaoService {
         entrada.setCarteira(destino.getCarteira());
         entrada.setDescricao("Recebido de " + origem.getNome());
 
-        transacaoRepository.save(saida);
-        transacaoRepository.save(entrada);
-
-        return List.of(saida, entrada);
+        return transacaoRepository.saveAll(List.of(saida, entrada));
     }
 }
