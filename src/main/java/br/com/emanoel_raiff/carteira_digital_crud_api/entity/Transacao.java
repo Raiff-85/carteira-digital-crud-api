@@ -12,6 +12,8 @@ import java.time.LocalDateTime;
 @Table(name = "transacoes")
 @Getter
 @Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class Transacao {
 
     @Id
@@ -26,10 +28,10 @@ public class Transacao {
     @Column(nullable = false)
     private LocalDateTime dataCriacao = LocalDateTime.now();
 
-    @NotNull(message = "O usuário responsável pela transação é obrigatório.")
+    @NotNull(message = "A carteira responsável pela transação é obrigatória.")
     @ManyToOne
-    @JoinColumn(name = "usuario_id", nullable = false)
-    private Usuario usuario;
+    @JoinColumn(name = "carteira_id", nullable = false)
+    private Carteira carteira;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

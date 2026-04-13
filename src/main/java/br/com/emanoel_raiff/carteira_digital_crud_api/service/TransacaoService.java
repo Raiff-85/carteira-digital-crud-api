@@ -23,115 +23,96 @@ public class TransacaoService {
     @Autowired
     private UsuarioRepository usuarioRepository;
 
-    public Transacao salvar(Transacao transacao) {
-
-        Long usuarioId = transacao.getUsuario().getId();
-
-        Usuario usuarioCompleto = usuarioRepository.findById(usuarioId)
-                .orElseThrow(() -> new EntidadeNaoEncontradaException("Usuário não encontrado."));
-
-        transacao.setUsuario(usuarioCompleto);
-
-        return transacaoRepository.save(transacao);
+    private Usuario buscarUsuarioOuFalhar(Long id) {
+        return usuarioRepository.findById(id)
+                .orElseThrow(() -> new EntidadeNaoEncontradaException("Usuário não encontrado (ID: " + id + ")"));
     }
 
     public List<Transacao> listarTodas() {
-
         return transacaoRepository.findAll();
+    }
 
+    // Método salvar corrigido para a nova arquitetura
+    public Transacao salvar(Transacao transacao) {
+        // Se a transação estiver tentando ser salva sem carteira, lançamos erro
+        if (transacao.getCarteira() == null || transacao.getCarteira().getId() == null) {
+            throw new RegraDeNegocioException("Uma carteira válida deve ser informada.");
+        }
+        return transacaoRepository.save(transacao);
     }
 
     @Transactional
     public Transacao depositar(Long usuarioId, BigDecimal valor) {
+        Usuario usuario = buscarUsuarioOuFalhar(usuarioId);
 
-        Usuario usuario = usuarioRepository.findById(usuarioId)
-                .orElseThrow(() -> new EntidadeNaoEncontradaException("Usuário não encontrado para depósito."));
-
-        BigDecimal novoSaldo = usuario.getSaldo().add(valor);
-        usuario.setSaldo(novoSaldo);
+        BigDecimal novoSaldo = usuario.getCarteira().getSaldo().add(valor);
+        usuario.getCarteira().setSaldo(novoSaldo);
         usuarioRepository.save(usuario);
 
         Transacao transacao = new Transacao();
         transacao.setValor(valor);
         transacao.setTipo(TipoTransacao.DEPOSITO);
-        transacao.setUsuario(usuario);
+        transacao.setCarteira(usuario.getCarteira());
+        transacao.setDescricao("Depósito em conta");
 
         return transacaoRepository.save(transacao);
     }
 
     @Transactional
     public Transacao sacar(Long usuarioId, BigDecimal valor) {
+        Usuario usuario = buscarUsuarioOuFalhar(usuarioId);
 
-        Usuario usuario = usuarioRepository.findById(usuarioId)
-                .orElseThrow(() -> new EntidadeNaoEncontradaException("Usuário não encontrado para saque."));
-
-        if (usuario.getSaldo().compareTo(valor) < 0) {
+        if (usuario.getCarteira().getSaldo().compareTo(valor) < 0) {
             throw new RegraDeNegocioException("Saldo insuficiente para realizar o saque.");
         }
 
-        BigDecimal novoSaldo = usuario.getSaldo().subtract(valor);
-        usuario.setSaldo(novoSaldo);
+        BigDecimal novoSaldo = usuario.getCarteira().getSaldo().subtract(valor);
+        usuario.getCarteira().setSaldo(novoSaldo);
         usuarioRepository.save(usuario);
 
         Transacao transacao = new Transacao();
         transacao.setValor(valor);
         transacao.setTipo(TipoTransacao.SAQUE);
-        transacao.setUsuario(usuario);
+        transacao.setCarteira(usuario.getCarteira());
+        transacao.setDescricao("Saque em espécie");
 
         return transacaoRepository.save(transacao);
     }
 
     @Transactional
     public List<Transacao> transferir(Long usuarioIdOrigem, Long usuarioIdDestino, BigDecimal valor) {
-
-        // 1. Não transferir para si mesmo
         if (usuarioIdOrigem.equals(usuarioIdDestino)) {
             throw new RegraDeNegocioException("Não é possível realizar uma transferência para a própria conta.");
         }
 
-        // 2. Busca dos usuários
-        Usuario usuarioOrigem = usuarioRepository.findById(usuarioIdOrigem)
-                .orElseThrow(() -> new EntidadeNaoEncontradaException("Usuário de origem não encontrado."));
+        Usuario origem = buscarUsuarioOuFalhar(usuarioIdOrigem);
+        Usuario destino = buscarUsuarioOuFalhar(usuarioIdDestino);
 
-        Usuario usuarioDestino = usuarioRepository.findById(usuarioIdDestino)
-                .orElseThrow(() -> new EntidadeNaoEncontradaException("Usuário de destino não encontrado."));
-
-        // 3. Validação de saldo da Origem
-        if (usuarioOrigem.getSaldo().compareTo(valor) < 0) {
-            throw new RegraDeNegocioException("Saldo insuficiente para realizar a transferência.");
+        if (origem.getCarteira().getSaldo().compareTo(valor) < 0) {
+            throw new RegraDeNegocioException("Saldo insuficiente para transferência.");
         }
 
-        // 4. Atualização matemática dos saldos
-        usuarioOrigem.setSaldo(usuarioOrigem.getSaldo().subtract(valor));
-        usuarioDestino.setSaldo(usuarioDestino.getSaldo().add(valor));
+        origem.getCarteira().setSaldo(origem.getCarteira().getSaldo().subtract(valor));
+        destino.getCarteira().setSaldo(destino.getCarteira().getSaldo().add(valor));
 
-        usuarioRepository.save(usuarioOrigem);
-        usuarioRepository.save(usuarioDestino);
+        usuarioRepository.save(origem);
+        usuarioRepository.save(destino);
 
-        // ==========================================
-        // 5. O LANÇAMENTO DUPLO COMEÇA AQUI
-        // ==========================================
+        Transacao saida = new Transacao();
+        saida.setValor(valor);
+        saida.setTipo(TipoTransacao.TRANSFERENCIA_ENVIADA);
+        saida.setCarteira(origem.getCarteira());
+        saida.setDescricao("Enviado para " + destino.getNome());
 
-        // Lançamento 1: O extrato de quem ENVIou o dinheiro (Saiu saldo)
-        Transacao transacaoSaida = new Transacao();
-        transacaoSaida.setValor(valor);
-        transacaoSaida.setTipo(TipoTransacao.TRANSFERENCIA_ENVIADA);
-        transacaoSaida.setUsuario(usuarioOrigem);
-        transacaoSaida.setDescricao("Transferência enviada para " + usuarioDestino.getNome());
+        Transacao entrada = new Transacao();
+        entrada.setValor(valor);
+        entrada.setTipo(TipoTransacao.TRANSFERENCIA_RECEBIDA);
+        entrada.setCarteira(destino.getCarteira());
+        entrada.setDescricao("Recebido de " + origem.getNome());
 
-        // Lançamento 2: O extrato de quem RECEBEU o dinheiro (Entrou saldo)
-        Transacao transacaoEntrada = new Transacao();
-        transacaoEntrada.setValor(valor);
-        transacaoEntrada.setTipo(TipoTransacao.TRANSFERENCIA_RECEBIDA);
-        transacaoEntrada.setUsuario(usuarioDestino);
-        transacaoEntrada.setDescricao("Transferência recebida de " + usuarioOrigem.getNome());
+        transacaoRepository.save(saida);
+        transacaoRepository.save(entrada);
 
-        // Salva as duas no banco de dados!
-        transacaoRepository.save(transacaoSaida);
-        transacaoRepository.save(transacaoEntrada);
-
-        // Como criamos duas transações, vamos retornar uma Lista com ambas
-        // para o Controller saber o que aconteceu
-        return List.of(transacaoSaida, transacaoEntrada);
+        return List.of(saida, entrada);
     }
 }

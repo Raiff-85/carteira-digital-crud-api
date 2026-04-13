@@ -12,3 +12,5 @@ spring:
     show-sql: true
   flyway:
     enabled: true
+    baseline-on-migrate: true
+    baseline-version: 4  # O banco atual já é a versão 4

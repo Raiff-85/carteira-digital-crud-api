@@ -1,5 +1,6 @@
 package br.com.emanoel_raiff.carteira_digital_crud_api.service;
 
+import br.com.emanoel_raiff.carteira_digital_crud_api.entity.Carteira;
 import br.com.emanoel_raiff.carteira_digital_crud_api.entity.Usuario;
 import br.com.emanoel_raiff.carteira_digital_crud_api.exception.EntidadeNaoEncontradaException;
 import br.com.emanoel_raiff.carteira_digital_crud_api.exception.RegraDeNegocioException;
@@ -29,7 +30,7 @@ public class UsuarioService {
             throw new RegraDeNegocioException("Este e-mail já está em uso por outro usuário.");
         }
 
-        // Atualizamos apenas campos permitidos. NUNCA atualizamos o CPF, Saldo ou ID aqui.
+        // Atualizamos apenas campos permitidos. A carteira (saldo) e o CPF continuam intactos.
         usuarioExistente.setNome(dadosAtualizados.getNome());
         usuarioExistente.setEmail(dadosAtualizados.getEmail());
 
@@ -44,7 +45,8 @@ public class UsuarioService {
     public void desativar(Long id) {
         Usuario usuarioExistente = buscarPorId(id);
 
-        if (usuarioExistente.getSaldo().compareTo(BigDecimal.ZERO) > 0) {
+        // Verificação de saldo dentro da carteira vinculada
+        if (usuarioExistente.getCarteira() != null && usuarioExistente.getCarteira().getSaldo().compareTo(BigDecimal.ZERO) > 0) {
             throw new RegraDeNegocioException("Não é possível excluir uma conta com saldo positivo.");
         }
 
@@ -65,10 +67,19 @@ public class UsuarioService {
             throw new RegraDeNegocioException("E-mail já cadastrado no sistema.");
         }
 
+        // Antes de salvar, criou-se uma carteira vinculada a este usuário.
+        // O construtor auxiliar que criamos em Carteira.java facilita muito isso.
+        Carteira novaCarteira = new Carteira(usuario);
+
+        // Atribuímos a carteira ao usuário. Como usamos CascadeType.ALL,
+        // ao salvar o usuário, o Spring salva a carteira no banco automaticamente!
+        usuario.setCarteira(novaCarteira);
+
         return repository.save(usuario);
     }
 
     public List<Usuario> listarTodos() {
+
         return repository.findAll();
     }
 }

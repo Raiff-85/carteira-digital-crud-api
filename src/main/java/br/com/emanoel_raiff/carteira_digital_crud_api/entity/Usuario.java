@@ -5,10 +5,8 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import org.hibernate.validator.constraints.br.CPF; // Olha que legal, o Java tem validação de CPF nativa!
+import org.hibernate.validator.constraints.br.CPF;
 import lombok.*;
-
-import java.math.BigDecimal;
 
 @Entity
 @Table(name = "usuarios")
@@ -44,19 +42,15 @@ public class Usuario {
     private String senha;
 
     @Column(nullable = false)
-    private BigDecimal saldo = BigDecimal.ZERO;
+    private Boolean ativo = true;
 
-    @Column(nullable = false)
-    private Boolean ativo = true; // Todo usuário nasce ativo
+    @OneToOne(mappedBy = "usuario", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Carteira carteira;
 
     @PrePersist
     public void prePersist() {
         if (this.ativo == null) {
             this.ativo = true;
-        }
-
-        if (this.saldo == null) {
-            this.saldo = BigDecimal.ZERO;
         }
     }
 }
